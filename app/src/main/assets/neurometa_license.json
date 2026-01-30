@@ -1,0 +1,9 @@
+{
+  "appKey": "neurometa_test_20260130",
+  "packageName": "com.neurometa.test",
+  "deviceTypes": ["EEG_SENSOR"],
+  "features": ["DATA_COLLECT", "EDF_RECORD", "FILTER"],
+  "issueDate": "2026-01-30",
+  "expireDate": "2056-01-30",
+  "signature": "DEV_SIGNATURE_NOT_FOR_PRODUCTION"
+}

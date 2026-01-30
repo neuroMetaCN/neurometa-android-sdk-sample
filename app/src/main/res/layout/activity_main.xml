@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/background_dark"
+    tools:context=".MainActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 顶部标题区域 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="24dp">
+
+            <!-- 系统时间 -->
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="14:16"
+                android:textSize="16sp"
+                android:textColor="@color/text_primary"
+                android:fontFamily="monospace" />
+
+            <!-- 主标题 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NEUROMETA"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:letterSpacing="0.1"
+                android:layout_marginTop="8dp" />
+
+            <!-- 副标题 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="EEG DATA ACQUISITION SDK"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:letterSpacing="0.15"
+                android:layout_marginTop="4dp" />
+
+        </LinearLayout>
+
+        <!-- 状态卡片区域 (3列) -->
+        <LinearLayout
+            android:id="@+id/layoutStatusCards"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="24dp"
+            android:background="@color/surface_dark"
+            android:padding="16dp">
+
+            <!-- BATTERY -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="BATTERY"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvBatteryLevel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent_green"
+                    android:layout_marginTop="4dp" />
+
+            </LinearLayout>
+
+            <!-- STATUS -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STATUS"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvWearStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/accent_green"
+                    android:layout_marginTop="8dp" />
+
+            </LinearLayout>
+
+
+
+        </LinearLayout>
+
+        <!-- 设备列表区域 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="24dp">
+
+            <!-- 设备区域标题 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="DEVICES"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvDeviceCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 FOUND"
+                    android:textSize="12sp"
+                    android:textColor="@color/accent_red"
+                    android:letterSpacing="0.1" />
+
+            </LinearLayout>
+
+            <!-- 设备列表 -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvDevices"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:itemCount="2"
+                tools:listitem="@layout/item_device" />
+
+            <!-- 连接状态（简化显示） -->
+            <TextView
+                android:id="@+id/tvDeviceInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- 实时 EEG 区域 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <!-- EEG 区域标题 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="REALTIME EEG"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvSamplingRate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="-- Hz LIVE"
+                    android:textSize="12sp"
+                    android:textColor="@color/accent_green"
+                    android:letterSpacing="0.05" />
+
+            </LinearLayout>
+
+            <!-- 通道选择器 -->
+            <TextView
+                android:id="@+id/tvChannelInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CH1 · FP1"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginBottom="8dp" />
+
+            <!-- EEG 波形图 -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="@color/chart_background">
+
+                <com.github.mikephil.charting.charts.LineChart
+                    android:id="@+id/chartEEG"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+            </FrameLayout>
+
+
+        </LinearLayout>
+
+        <!-- 扫描设备按钮 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnScan"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="SCAN DEVICES"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="16dp"
+            app:backgroundTint="@color/accent_red"
+            app:cornerRadius="4dp" />
+
+        <!-- 断开连接按钮 (隐藏状态) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDisconnect"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="DISCONNECT"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            app:strokeColor="@color/accent_red"
+            app:strokeWidth="1dp"
+            android:textColor="@color/accent_red"
+            app:cornerRadius="4dp" />
+
+        <!-- 控制台日志区域 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="24dp">
+
+            <!-- 日志区域标题 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="CONSOLE LOG"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/btnClearLog"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CLEAR"
+                    android:textSize="12sp"
+                    android:textColor="@color/accent_red"
+                    android:letterSpacing="0.1"
+                    android:padding="4dp" />
+
+            </LinearLayout>
+
+            <!-- 日志内容 -->
+            <ScrollView
+                android:id="@+id/scrollLog"
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:background="@color/surface_dark"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/tvLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/text_secondary"
+                    android:lineSpacingExtra="4dp" />
+
+            </ScrollView>
+
+        </LinearLayout>
+
+        <!-- Record EDF 链接 -->
+        <TextView
+            android:id="@+id/btnRecordEdf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Record EDF"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:padding="16dp" />
+
+        <!-- 录制状态 (隐藏) -->
+        <TextView
+            android:id="@+id/tvRecordStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:textSize="12sp"
+            android:textColor="@color/accent_green"
+            android:gravity="center" />
+
+        <!-- 隐藏的状态视图 (兼容旧代码) -->
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvDataInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/layoutDeviceStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:orientation="horizontal" />
+
+    </LinearLayout>
+</ScrollView>
