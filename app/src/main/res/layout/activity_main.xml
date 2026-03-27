@@ -239,6 +239,373 @@
 
         </LinearLayout>
 
+        <!-- ============ SPECTRAL COMPONENTS ============ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="SPECTRAL COMPONENTS"
+                    android:textSize="12sp"
+                    android:textColor="@color/section_label"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvPsdStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="INIT"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.05" />
+            </LinearLayout>
+
+            <!-- 频段卡片容器 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/surface_dark"
+                android:padding="12dp">
+
+                <!-- DELTA -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginBottom="4dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="DELTA"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/band_delta"
+                        android:letterSpacing="0.05" />
+
+                    <TextView
+                        android:id="@+id/tvDeltaPower"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="0.0 μV"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chartDelta"
+                        android:layout_width="match_parent"
+                        android:layout_height="45dp"
+                        android:layout_alignParentBottom="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:text="Delta"
+                        android:textSize="10sp"
+                        android:textColor="@color/band_delta"
+                        android:alpha="0.6" />
+                </RelativeLayout>
+
+                <!-- THETA -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginBottom="4dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="THETA"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/band_theta"
+                        android:letterSpacing="0.05" />
+
+                    <TextView
+                        android:id="@+id/tvThetaPower"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="0.0 μV"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chartTheta"
+                        android:layout_width="match_parent"
+                        android:layout_height="45dp"
+                        android:layout_alignParentBottom="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:text="Theta"
+                        android:textSize="10sp"
+                        android:textColor="@color/band_theta"
+                        android:alpha="0.6" />
+                </RelativeLayout>
+
+                <!-- ALPHA -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginBottom="4dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ALPHA"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/band_alpha"
+                        android:letterSpacing="0.05" />
+
+                    <TextView
+                        android:id="@+id/tvAlphaPower"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="0.0 μV"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chartAlpha"
+                        android:layout_width="match_parent"
+                        android:layout_height="45dp"
+                        android:layout_alignParentBottom="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:text="Alpha"
+                        android:textSize="10sp"
+                        android:textColor="@color/band_alpha"
+                        android:alpha="0.6" />
+                </RelativeLayout>
+
+                <!-- BETA -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginBottom="4dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="BETA"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/band_beta"
+                        android:letterSpacing="0.05" />
+
+                    <TextView
+                        android:id="@+id/tvBetaPower"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="0.0 μV"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chartBeta"
+                        android:layout_width="match_parent"
+                        android:layout_height="45dp"
+                        android:layout_alignParentBottom="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:text="Beta"
+                        android:textSize="10sp"
+                        android:textColor="@color/band_beta"
+                        android:alpha="0.6" />
+                </RelativeLayout>
+
+                <!-- GAMMA -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="GAMMA"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/band_gamma"
+                        android:letterSpacing="0.05" />
+
+                    <TextView
+                        android:id="@+id/tvGammaPower"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="0.0 μV"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <com.github.mikephil.charting.charts.LineChart
+                        android:id="@+id/chartGamma"
+                        android:layout_width="match_parent"
+                        android:layout_height="45dp"
+                        android:layout_alignParentBottom="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:text="Gamma"
+                        android:textSize="10sp"
+                        android:textColor="@color/band_gamma"
+                        android:alpha="0.6" />
+                </RelativeLayout>
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ============ PRECISION CONTROLS ============ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PRECISION CONTROLS"
+                android:textSize="12sp"
+                android:textColor="@color/section_label"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/surface_dark"
+                android:padding="16dp">
+
+                <!-- GAIN 控制 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="GAIN"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/accent_red"
+                            android:letterSpacing="0.05" />
+
+                        <TextView
+                            android:id="@+id/tvGainValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="1.0x"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekGain"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="99"
+                        android:progress="9"
+                        android:progressTint="@color/accent_red"
+                        android:thumbTint="@color/accent_red"
+                        android:progressBackgroundTint="@color/control_track" />
+                </LinearLayout>
+
+                <!-- WINDOW 控制 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="WINDOW"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/accent_green"
+                            android:letterSpacing="0.05" />
+
+                        <TextView
+                            android:id="@+id/tvWindowValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="2.0s"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekWindow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="70"
+                        android:progress="30"
+                        android:progressTint="@color/accent_green"
+                        android:thumbTint="@color/accent_green"
+                        android:progressBackgroundTint="@color/control_track" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- 扫描设备按钮 -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScan"

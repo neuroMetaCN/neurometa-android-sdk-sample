@@ -1,58 +1,68 @@
-# NeuroMeta SDK 集成测试 Demo
+# NeuroMeta Android SDK 集成测试 Demo
 
-本项目是 `NeuroMeta Android SDK` 的官方集成示例，演示如何在 Android 应用中接入 EEG 脑电数据采集功能。
+`neurometa-android-test` 是 `NeuroMeta Android SDK` 的联调与验收示例工程，重点覆盖设备扫描连接、实时 EEG 波形、前额单通道 PSD 展示、佩戴状态联动和 EDF 录制。
 
-## 📋 功能清单
-
-| 功能 | 状态 | 说明 |
-|-----|------|------|
-| SDK 初始化 | ✅ | License 授权验证 |
-| 蓝牙设备扫描 | ✅ | 扫描 EEG Sensor 设备 |
-| 蓝牙设备连接 | ✅ | BLE 连接管理 |
-| 实时数据采集 | ✅ | 250Hz 原始采样 → 50Hz 滤波输出 |
-| 实时波形显示 | ✅ | MPAndroidChart 绘制 |
-| EDF 文件录制 | ✅ | 标准 EDF 格式输出 |
-| 设备状态监测 | ✅ | 电池电量 & 佩戴状态 |
+本文档以当前代码实现为准，主要说明：
+- Demo 当前具备哪些能力
+- 实时 EEG 与 PSD 的实际数据流
+- 哪些文件负责 UI、监听器和映射逻辑
+- 什么时候需要重新打 SDK AAR
 
 ---
 
-## 🚀 快速开始
+## 功能概览
 
-### 1. 添加 SDK 依赖
+| 功能 | 状态 | 说明 |
+|---|---|---|
+| SDK 初始化 | ✅ | 从 `assets/neurometa_license.json` 加载 License |
+| BLE 设备扫描/连接 | ✅ | 扫描 EEG Sensor 设备并建立连接 |
+| 实时 EEG 主波形 | ✅ | 主图展示滤波后的实时波形 |
+| 实时 PSD 五频段 | ✅ | `Delta / Theta / Alpha / Beta / Gamma` 五路趋势图与数值 |
+| PSD 状态联动 | ✅ | 佩戴状态、质量状态、模式文案联动 |
+| PSD 参数调节 | ✅ | 当前仅保留 `Gain` 与 `Window` 两项控制 |
+| EDF 录制 | ✅ | 录制到 `Documents/edf/` |
+| 电池/佩戴状态显示 | ✅ | 实时显示设备电量与佩戴状态 |
 
-将 `neurometa-android-sdk-release.aar` 复制到 `app/libs/` 目录：
+---
+
+## 当前架构
+
+当前 Demo **依赖本地 AAR**，不是直接依赖源码 module：
 
 ```kotlin
-// app/build.gradle.kts
-dependencies {
-    // NeuroMeta SDK
-    implementation(files("libs/neurometa-android-sdk-release.aar"))
-    
-    // SDK 必需依赖
-    implementation("org.apache.commons:commons-math3:3.6.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-}
+implementation(files("libs/neurometa-android-sdk-release.aar"))
 ```
 
-### 2. 配置 AndroidManifest.xml
+这意味着：
+- 如果只改 `neurometa-android-test` 代码，不需要重新打 SDK 包
+- 如果改了 `app/neurometa-android-sdk` 源码，必须重新生成并复制 AAR
 
-```xml
-<!-- 蓝牙权限 -->
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+SDK 打包与复制命令：
 
-<!-- 存储权限 (EDF 录制) -->
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
-    android:maxSdkVersion="28" />
+```powershell
+cd app/neurometa-android-sdk
+.\gradlew.bat buildSdk
 ```
 
-### 3. 准备 License 文件
+该命令会构建 `release` AAR，并复制到：
 
-在 `app/src/main/assets/` 创建 `neurometa_license.json`：
+```text
+app/neurometa-android-test/app/libs/neurometa-android-sdk-release.aar
+```
+
+---
+
+## 快速开始
+
+### 1. 准备 License
+
+在 `app/src/main/assets/` 下放置：
+
+```text
+neurometa_license.json
+```
+
+示例结构：
 
 ```json
 {
@@ -66,344 +76,213 @@ dependencies {
 }
 ```
 
-> ⚠️ **注意**: 请联系 NeuroMeta 获取正式授权 License
+### 2. 运行 Demo
+
+```powershell
+cd app/neurometa-android-test
+.\gradlew.bat installDebug
+```
+
+### 3. 基本使用流程
+
+1. 打开 App，授予蓝牙与定位权限
+2. 等待 SDK 初始化成功
+3. 点击 `SCAN DEVICES`
+4. 选择设备并连接
+5. 佩戴后查看主波形与五频段 PSD
+6. 如有需要，点击 `Record EDF` 开始录制
 
 ---
 
-## 📖 SDK 对接流程
+## 实时数据流
 
+当前数据流不是 README 旧版本里描述的“单一 RealtimeDataListener 驱动全部 UI”，而是下面这套更明确的链路：
+
+```text
+Device -> SDK DataCollector
+       -> UnfilteredDataListener -> PSDAnalyzer -> PSDResult -> PsdUiState -> PSD UI
+       -> UnfilteredDataListener -> FilteredEEGProcessor -> EEG 主波形
+       -> DeviceStatusListener   -> 电量/佩戴状态/PSD 门控
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        SDK 对接流程图                             │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
-│   │ 1. 权限申请  │ ──▶ │ 2. SDK初始化 │ ──▶ │ 3. 注册监听器│       │
-│   └─────────────┘     └─────────────┘     └─────────────┘       │
-│                                                 │                │
-│                                                 ▼                │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
-│   │ 6. 数据处理  │ ◀── │ 5. 数据接收  │ ◀── │ 4. 扫描连接  │       │
-│   └─────────────┘     └─────────────┘     └─────────────┘       │
-│         │                                                        │
-│         ▼                                                        │
-│   ┌─────────────┐     ┌─────────────┐                           │
-│   │ 7. 波形显示  │     │ 8. EDF录制  │  (可选)                    │
-│   └─────────────┘     └─────────────┘                           │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+### 1. PSD 数据流
+
+- 输入来源：`UnfilteredDataListener`
+- 取值通道：`packet.channelData[0]`
+- 分析器：`PSDAnalyzer`
+- UI 模型：`PsdUiState`
+
+主界面现在**不直接消费** `PSDAnalyzer.PSDResult` 的全部诊断字段，而是先映射成更精简的 `PsdUiState`，只渲染：
+- 五个最终频段功率
+- `signalQuality`
+- `isDataValid`
+- 简化后的 `statusText`
+
+这样 UI 不会被 `deltaConfidence`、`artifactReason`、`qualityScore` 等内部诊断字段绑死。
+
+### 2. EEG 主波形数据流
+
+- 输入来源：原始 `channelData[0]`
+- 中间处理：`FilteredEEGProcessor`
+- 输出：主波形图 `chartEEG`
+
+因此：
+- 主波形展示的是滤波后的实时波形
+- PSD 展示的是单独分析链路算出的频段结果
+
+### 3. 设备状态联动
+
+`DeviceStatusListener` 会驱动：
+- 电池电量显示
+- `WEARING / NOT WORN` 状态
+- `PSDAnalyzer.updateWearState(status.wear)`
+
+所以佩戴状态会直接影响 PSD 是否进入稳定输出。
 
 ---
 
-## 📝 详细步骤
+## PSD 界面说明
 
-### Step 1: 权限申请
+### 当前显示内容
 
-SDK 在 Android 12+ 需要动态申请蓝牙权限：
+`SPECTRAL COMPONENTS` 区域包含：
+- `DELTA`
+- `THETA`
+- `ALPHA`
+- `BETA`
+- `GAMMA`
 
-```kotlin
-private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-    arrayOf(
-        Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.BLUETOOTH_CONNECT,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    )
-} else {
-    arrayOf(
-        Manifest.permission.BLUETOOTH,
-        Manifest.permission.BLUETOOTH_ADMIN,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    )
-}
+每个频段都有：
+- 一个最终功率数值
+- 一条最近 5 秒的趋势图
 
-private fun checkPermissions() {
-    val missing = REQUIRED_PERMISSIONS.filter {
-        ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-    }
-    if (missing.isNotEmpty()) {
-        ActivityCompat.requestPermissions(this, missing.toTypedArray(), REQUEST_PERMISSIONS)
-    } else {
-        initSDK()  // 权限已获取，初始化 SDK
-    }
-}
+状态栏 `tvPsdStatus` 显示精简模式文案，例如：
+
+```text
+AWAKE FRONTAL · READY
+AWAKE FRONTAL · READY · FAIR
+AWAKE FRONTAL · NOT WORN
+SLEEP RAW · STABILIZING
 ```
+
+### 当前控制项
+
+`PRECISION CONTROLS` 当前只保留：
+- `GAIN`
+- `WINDOW`
+
+说明：
+- `GAIN`：影响频段数值显示缩放
+- `WINDOW`：影响 PSD 分析窗口长度
+- `Y zoom` 已从当前版本移除，频段图使用固定默认 Y 轴范围
 
 ---
 
-### Step 2: SDK 初始化
+## 关键文件
 
-```kotlin
-private val sdk: NeuroMetaSDK by lazy { NeuroMetaSDK.getInstance() }
-
-private fun initSDK() {
-    // 从 assets 加载 License
-    val license = License.fromAssets(this, "neurometa_license.json")
-    
-    sdk.init(
-        context = this,
-        license = license,
-        callback = object : NeuroMetaSDK.InitCallback {
-            override fun onSuccess() {
-                Log.d(TAG, "SDK 初始化成功")
-                setupDataListeners()  // 注册数据监听器
-            }
-
-            override fun onError(error: SDKError) {
-                Log.e(TAG, "SDK 初始化失败: ${error.message}")
-            }
-        },
-        allowDevLicense = true  // 开发环境允许测试 License
-    )
-}
-```
-
----
-
-### Step 3: 注册数据监听器
-
-SDK 提供多种监听器，按需注册：
-
-```kotlin
-private fun setupDataListeners() {
-    val dataCollector = sdk.getDataCollector()
-    
-    // 监听器 1: 实时滤波数据 (推荐用于 UI 显示)
-    dataCollector.addRealtimeDataListener(object : DataCollector.RealtimeDataListener {
-        override fun onRealtimeData(packet: EEGDataPacket) {
-            // 已滤波 + 降采样，适合波形绑制
-            val samples = packet.channelData[0] ?: return
-            updateChart(samples)
-        }
-    })
-    
-    // 监听器 2: 未滤波原始数据 (用于调试/科研)
-    dataCollector.addUnfilteredDataListener(object : DataCollector.UnfilteredDataListener {
-        override fun onUnfilteredData(packet: EEGDataPacket) {
-            // 原始 250Hz 数据
-            val rawSamples = packet.channelData[0] ?: return
-            Log.d(TAG, "原始数据: ${rawSamples.take(5)}")
-        }
-    })
-    
-    // 监听器 3: 设备状态 (电池 + 佩戴)
-    dataCollector.addDeviceStatusListener(object : DataCollector.DeviceStatusListener {
-        override fun onDeviceStatus(status: DeviceStatus) {
-            updateBatteryUI(status.batteryLevel)
-            updateWearUI(status.wear)
-        }
-    })
-}
-```
-
-**监听器类型对比：**
-
-| 监听器 | 采样率 | 滤波状态 | 典型用途 |
-|-------|-------|---------|---------|
-| `RealtimeDataListener` | 50Hz | ✅ 已滤波 | UI 波形显示 |
-| `UnfilteredDataListener` | 250Hz | ❌ 未滤波 | 调试/科研分析 |
-| `FilteredDataListener` | 250Hz | ✅ 已滤波 | 特征提取 |
-| `DeviceStatusListener` | - | - | 电池/佩戴状态 |
-
----
-
-### Step 4: 扫描 & 连接设备
-
-```kotlin
-// 开始扫描
-private fun startScan() {
-    sdk.getDeviceManager().startScan(
-        timeout = 3000L,  // 扫描 3 秒
-        callback = object : DeviceManager.ScanCallback {
-            override fun onDeviceFound(device: Device) {
-                Log.d(TAG, "发现设备: ${device.name ?: device.id}")
-                deviceList.add(device)
-                updateUI()
-            }
-
-            override fun onComplete(devices: List<Device>) {
-                Log.d(TAG, "扫描完成，共 ${devices.size} 个设备")
-            }
-
-            override fun onError(error: SDKError) {
-                Log.e(TAG, "扫描失败: ${error.message}")
-            }
-        }
-    )
-}
-
-// 连接设备
-private fun connectDevice(device: Device) {
-    sdk.getDeviceManager().connect(
-        deviceId = device.id,
-        callback = object : DeviceManager.ConnectionCallback {
-            override fun onConnected() {
-                Log.d(TAG, "连接成功，开始接收数据")
-                // 数据会自动推送到已注册的监听器
-            }
-
-            override fun onDisconnected() {
-                Log.d(TAG, "设备已断开")
-            }
-
-            override fun onError(error: SDKError) {
-                Log.e(TAG, "连接失败: ${error.message}")
-            }
-        }
-    )
-}
-```
-
----
-
-### Step 5: 实时数据处理 (滤波)
-
-如需对原始数据进行二次滤波处理：
-
-```kotlin
-// 使用 FilteredEEGProcessor 进行实时滤波
-FilteredEEGProcessor.getInstance().setCallback { packet ->
-    runOnUiThread {
-        // packet.samples: 滤波 + 降采样后的数据
-        updateChartData(packet.samples)
-    }
-}
-
-// 将原始数据送入滤波器
-dataCollector.addRealtimeDataListener(object : DataCollector.RealtimeDataListener {
-    override fun onRealtimeData(packet: EEGDataPacket) {
-        packet.channelData[0]?.let { samples ->
-            FilteredEEGProcessor.getInstance().addSamples(samples)
-        }
-    }
-})
-```
-
----
-
-### Step 6: EDF 文件录制
-
-```kotlin
-private var isRecording = false
-
-private fun startRecording() {
-    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val fileName = "eeg_$timestamp.edf"
-    val outputDir = File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "edf")
-    outputDir.mkdirs()
-    val filePath = File(outputDir, fileName).absolutePath
-
-    sdk.getEdfRecorder().startRecording(
-        outputPath = filePath,
-        callback = object : EdfRecorder.RecordingCallback {
-            override fun onRecordingStarted(filePath: String) {
-                isRecording = true
-                Log.d(TAG, "录制开始: $filePath")
-            }
-
-            override fun onRecordingStopped(filePath: String, recordCount: Int) {
-                isRecording = false
-                Log.d(TAG, "录制完成: $recordCount 条记录")
-            }
-
-            override fun onError(message: String) {
-                Log.e(TAG, "录制错误: $message")
-            }
-        }
-    )
-}
-
-private fun stopRecording() {
-    sdk.getEdfRecorder().stopRecording()
-}
-```
-
----
-
-### Step 7: 资源释放
-
-在 Activity 销毁时释放资源：
-
-```kotlin
-override fun onDestroy() {
-    super.onDestroy()
-    
-    // 停止录制
-    if (isRecording) {
-        sdk.getEdfRecorder().stopRecording()
-    }
-    
-    // 断开设备
-    sdk.getDeviceManager().disconnect()
-    
-    // 可选: 销毁 SDK (通常在 Application 级别管理)
-    // sdk.destroy()
-}
-```
-
----
-
-## 📂 项目结构
-
-```
-neurometa-android-test/
+```text
+app/neurometa-android-test/
 ├── app/
 │   ├── libs/
-│   │   └── neurometa-android-sdk-release.aar  ← SDK 库文件
+│   │   └── neurometa-android-sdk-release.aar
 │   ├── src/main/
 │   │   ├── assets/
-│   │   │   └── neurometa_license.json         ← License 配置
+│   │   │   └── neurometa_license.json
 │   │   ├── java/com/neurometa/test/
-│   │   │   ├── MainActivity.kt                ← 主界面 (完整示例)
-│   │   │   └── DeviceAdapter.kt               ← 设备列表适配器
-│   │   ├── res/
-│   │   │   ├── layout/
-│   │   │   │   └── activity_main.xml          ← UI 布局
-│   │   │   └── values/
-│   │   │       └── colors.xml                 ← 颜色定义
-│   │   └── AndroidManifest.xml
-│   └── build.gradle.kts
+│   │   │   ├── MainActivity.kt
+│   │   │   ├── DeviceAdapter.kt
+│   │   │   └── PsdUiState.kt
+│   │   └── res/layout/
+│   │       └── activity_main.xml
+│   └── src/test/java/com/neurometa/test/
+│       ├── PsdUiStateMapperTest.kt
+│       └── ActivityMainLayoutRegressionTest.kt
 ├── build.gradle.kts
 ├── settings.gradle.kts
-└── README.md                                   ← 本文档
+└── README.md
+```
+
+### 文件职责
+
+- `app/src/main/java/com/neurometa/test/MainActivity.kt`
+  负责权限、SDK 初始化、设备扫描连接、监听器注册、UI 更新、EDF 录制
+- `app/src/main/java/com/neurometa/test/PsdUiState.kt`
+  负责把 SDK 的 `PSDResult` 映射为 UI 所需的极简模型
+- `app/src/main/res/layout/activity_main.xml`
+  当前主页面布局，已移除 `Y zoom`
+- `app/src/test/java/com/neurometa/test/PsdUiStateMapperTest.kt`
+  约束 PSD UI 映射逻辑
+- `app/src/test/java/com/neurometa/test/ActivityMainLayoutRegressionTest.kt`
+  防止 `Y zoom` 控件重新进入主布局
+
+---
+
+## 常用命令
+
+### 仅验证 Demo App
+
+```powershell
+cd app/neurometa-android-test
+.\gradlew.bat :app:compileDebugKotlin
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+### 仅跑 PSD UI 相关测试
+
+```powershell
+cd app/neurometa-android-test
+.\gradlew.bat testDebugUnitTest --tests com.neurometa.test.PsdUiStateMapperTest
+.\gradlew.bat testDebugUnitTest --tests com.neurometa.test.ActivityMainLayoutRegressionTest
+```
+
+### SDK 改动后重新打包
+
+```powershell
+cd app/neurometa-android-sdk
+.\gradlew.bat buildSdk
 ```
 
 ---
 
-## ⚠️ 常见问题
+## 常见问题
 
-### Q1: 扫描不到设备？
+### 扫描不到设备
+
 - 确认蓝牙已开启
-- 确认位置权限已授予
-- 确认设备已开机且在范围内
-- Android 12+ 需要 `BLUETOOTH_SCAN` 权限
+- 确认定位权限已授予
+- Android 12+ 需要 `BLUETOOTH_SCAN` 与 `BLUETOOTH_CONNECT`
+- 确认设备已开机且未被其他手机占用
 
-### Q2: 连接失败？
-- 检查设备是否已被其他手机连接
-- 尝试重启设备后重新扫描
-- 查看 Logcat 中的错误详情
+### 已连接但 PSD 不更新
 
-### Q3: 数据不显示？
-- 确认设备已正确佩戴（检查 `DeviceStatus.wear`）
-- 确认已注册 `RealtimeDataListener`
-- 检查图表更新是否在主线程
+- 确认设备已正确佩戴
+- 检查 `tvWearStatus` 是否为 `WEARING`
+- 检查 `tvPsdStatus` 是否处于 `STABILIZING` 或 `NOT WORN`
+- 确认 `channelData[0]` 有原始 EEG 数据输入
 
-### Q4: EDF 文件无法打开？
-- 确保录制时间 > 1 秒
-- 检查存储权限
-- 使用 EDFbrowser 等专业工具打开
+### 主波形有数据但 PSD 数值异常
 
----
+- PSD 使用的是独立分析链路，不等于主波形图本身
+- 检查当前 `GAIN` 和 `WINDOW` 设置
+- 如刚修改 SDK 源码，确认是否重新执行了 `buildSdk`
 
-## 📞 技术支持
+### EDF 文件无法打开
 
-- **SDK 版本**: v1.1.0
-- **最低 Android 版本**: API 21 (Android 5.0)
-- **目标 Android 版本**: API 35 (Android 15)
-- **联系方式**: sdk-support@neurometa.com.cn
+- 确保录制时长足够
+- 检查应用文档目录写入是否正常
+- 使用 EDFbrowser 等工具打开验证
 
 ---
 
-## 📜 License
+## 环境信息
+
+- Android Gradle Plugin：`8.5.2`
+- Kotlin：`2.0.21`
+- minSdk：`21`
+- targetSdk：`35`
+
+---
+
+## License
 
 Copyright © 2026 NeuroMeta. All rights reserved.
