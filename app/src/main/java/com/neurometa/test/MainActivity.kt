@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -42,6 +43,25 @@ import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        private const val REQUEST_PERMISSIONS = 100
+        private const val RAW_LOG_TAG = "NeuroMeta-TestRaw"
+        private const val EEG_LOG_TAG = "NeuroMeta-TestEEG"
+        private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        } else {
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+    }
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var deviceAdapter: DeviceAdapter
     
@@ -72,6 +92,7 @@ class MainActivity : AppCompatActivity() {
         "beta" to BandChartState(),
         "gamma" to BandChartState()
     )
+    private var currentPsdDisplayMode = DisplayMode.ABS_UV
     private val psdChartFrameIntervalMs = 50L
     private val psdChartWindowMs = 5_000L
     private val bandMaxPoints = (psdChartWindowMs / psdChartFrameIntervalMs).toInt()
@@ -91,23 +112,22 @@ class MainActivity : AppCompatActivity() {
             timeHandler.postDelayed(this, psdChartFrameIntervalMs)
         }
     }
-
-    companion object {
-        private const val REQUEST_PERMISSIONS = 100
-        private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
+    private val rawBleDebugListener =
+        object : DeviceManager.DataListener {
+            override fun onRawDataReceived(data: ByteArray) {
+                val message = DebugLogFormatter.formatRawPacket(data)
+                Log.d(RAW_LOG_TAG, message)
+                runOnUiThread { log(message) }
+            }
         }
-    }
+    private val parsedEegDebugListener =
+        object : DataCollector.UnfilteredDataListener {
+            override fun onUnfilteredData(packet: EEGDataPacket) {
+                val message = DebugLogFormatter.formatParsedEeg(packet)
+                Log.d(EEG_LOG_TAG, message)
+                runOnUiThread { log(message) }
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -214,7 +234,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupBandChart(chart: LineChart, band: String, color: Int) {
         val axisMin = 0f
-        val axisMax = resolveBandYAxisMax(band)
+        val axisMax = resolveBandYAxisMax(band, currentPsdDisplayMode)
         chart.apply {
             description.isEnabled = false
             legend.isEnabled = false
@@ -253,7 +273,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun resolveBandYAxisMax(band: String): Float {
+    private fun resolveBandYAxisMax(band: String, displayMode: DisplayMode): Float {
+        if (displayMode == DisplayMode.REL_PERCENT) return 100f
         return when (band) {
             "delta" -> 50f
             "theta" -> 30f
@@ -319,6 +340,25 @@ class MainActivity : AppCompatActivity() {
         updateBandTarget("alpha", uiState.alphaPower)
         updateBandTarget("beta", uiState.betaPower)
         updateBandTarget("gamma", uiState.gammaPower)
+    }
+
+    private fun updatePsdDisplayMode(displayMode: DisplayMode) {
+        if (currentPsdDisplayMode == displayMode) return
+        currentPsdDisplayMode = displayMode
+
+        val charts = mapOf(
+            "delta" to binding.chartDelta,
+            "theta" to binding.chartTheta,
+            "alpha" to binding.chartAlpha,
+            "beta" to binding.chartBeta,
+            "gamma" to binding.chartGamma
+        )
+
+        for ((band, chart) in charts) {
+            chart.axisLeft.axisMaximum = resolveBandYAxisMax(band, displayMode)
+            chart.invalidate()
+        }
+        resetBandCharts()
     }
 
     private fun updateBandTarget(band: String, value: Double) {
@@ -446,12 +486,13 @@ class MainActivity : AppCompatActivity() {
         psdAnalyzer.addListener { result ->
             runOnUiThread {
                 val uiState = result.toPsdUiState()
+                updatePsdDisplayMode(uiState.displayMode)
 
-                binding.tvDeltaPower.text = formatUv(uiState.deltaPower)
-                binding.tvThetaPower.text = formatUv(uiState.thetaPower)
-                binding.tvAlphaPower.text = formatUv(uiState.alphaPower)
-                binding.tvBetaPower.text = formatUv(uiState.betaPower)
-                binding.tvGammaPower.text = formatUv(uiState.gammaPower)
+                binding.tvDeltaPower.text = formatBandValue(uiState.deltaPower, uiState.displayMode)
+                binding.tvThetaPower.text = formatBandValue(uiState.thetaPower, uiState.displayMode)
+                binding.tvAlphaPower.text = formatBandValue(uiState.alphaPower, uiState.displayMode)
+                binding.tvBetaPower.text = formatBandValue(uiState.betaPower, uiState.displayMode)
+                binding.tvGammaPower.text = formatBandValue(uiState.gammaPower, uiState.displayMode)
 
                 val statusColor = when (uiState.signalQuality) {
                     PSDAnalyzer.SignalQuality.GOOD -> Color.parseColor("#43A047")
@@ -468,8 +509,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatUv(value: Double): String {
-        return String.format(Locale.getDefault(), "%.1f μV", value)
+    private fun formatBandValue(value: Double, displayMode: DisplayMode): String {
+        return when (displayMode) {
+            DisplayMode.ABS_UV -> String.format(Locale.getDefault(), "%.1f μV", value)
+            DisplayMode.REL_PERCENT -> String.format(Locale.getDefault(), "%.1f %%", value)
+        }
     }
 
     private fun setPsdVisualState(signalQuality: PSDAnalyzer.SignalQuality, isDataValid: Boolean) {
@@ -553,6 +597,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupDataListener() {
         val dataCollector = sdk.getDataCollector()
+        sdk.getDeviceManager().addDataListener(rawBleDebugListener)
         
         // 未滤波数据 → PSDAnalyzer + FilteredEEGProcessor
         dataCollector.addUnfilteredDataListener(object : DataCollector.UnfilteredDataListener {
@@ -567,18 +612,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
-        
-        // 未滤波数据监听器（原始数据，用于调试）
-        dataCollector.addUnfilteredDataListener(object : DataCollector.UnfilteredDataListener {
-            override fun onUnfilteredData(packet: EEGDataPacket) {
-                // 输出原始数据日志（每个包都输出）
-                val samples = packet.channelData[0] ?: return
-                val firstSamples = samples.take(5).map { String.format("%.1f", it) }
-                runOnUiThread {
-                    log("[RAW] seq=${packet.sequenceNumber}, ch=0, data=${firstSamples.joinToString(",")}")
-                }
-            }
-        })
+
+        dataCollector.addUnfilteredDataListener(parsedEegDebugListener)
 
         // 设备状态监听器（电量、佩戴状态）
         dataCollector.addDeviceStatusListener(object : DataCollector.DeviceStatusListener {
@@ -871,6 +906,8 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         timeHandler.removeCallbacks(timeUpdateRunnable)
         timeHandler.removeCallbacks(psdChartRenderRunnable)
+        sdk.getDeviceManager().removeDataListener(rawBleDebugListener)
+        sdk.getDataCollector().removeUnfilteredDataListener(parsedEegDebugListener)
         psdAnalyzer.cleanup()
         if (isRecording) {
             sdk.getEdfRecorder().stopRecording()

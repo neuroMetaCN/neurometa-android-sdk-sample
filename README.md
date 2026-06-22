@@ -15,7 +15,7 @@
 | 功能 | 状态 | 说明 |
 |---|---|---|
 | SDK 初始化 | ✅ | 从 `assets/neurometa_license.json` 加载 License |
-| BLE 设备扫描/连接 | ✅ | 扫描 EEG Sensor 设备并建立连接 |
+| BLE 设备扫描/连接 | ✅ | 扫描 `EEG_SENSOR` / `SMART_EEG` 设备并建立连接 |
 | 实时 EEG 主波形 | ✅ | 主图展示滤波后的实时波形 |
 | 实时 PSD 五频段 | ✅ | `Delta / Theta / Alpha / Beta / Gamma` 五路趋势图与数值 |
 | PSD 状态联动 | ✅ | 佩戴状态、质量状态、模式文案联动 |
@@ -68,7 +68,7 @@ neurometa_license.json
 {
   "appKey": "your_app_key",
   "packageName": "your.package.name",
-  "deviceTypes": ["EEG_SENSOR"],
+  "deviceTypes": ["EEG_SENSOR", "SMART_EEG"],
   "features": ["DATA_COLLECT", "EDF_RECORD", "FILTER"],
   "issueDate": "2026-01-30",
   "expireDate": "2027-01-30",
@@ -92,6 +92,10 @@ cd app/neurometa-android-test
 5. 佩戴后查看主波形与五频段 PSD
 6. 如有需要，点击 `Record EDF` 开始录制
 
+补充：
+- SmartEEG 广播名默认兼容 `SmartEEG-XXXX` 和 `EM09E-XXXXXX`
+- Demo 无需单独切换模式，SDK 会在连接阶段自动识别设备类型
+
 ---
 
 ## 实时数据流
@@ -114,6 +118,7 @@ Device -> SDK DataCollector
 
 主界面现在**不直接消费** `PSDAnalyzer.PSDResult` 的全部诊断字段，而是先映射成更精简的 `PsdUiState`，只渲染：
 - 五个最终频段功率
+- 当前展示模式（绝对 `μV` / 相对 `%`）
 - `signalQuality`
 - `isDataValid`
 - 简化后的 `statusText`
@@ -156,6 +161,12 @@ Device -> SDK DataCollector
 - 一个最终功率数值
 - 一条最近 5 秒的趋势图
 
+当前显示口径按模式区分：
+- `AWAKE FRONTAL`
+  默认展示 **相对百分比 (%)**。目的是避免前额单通道在清醒态下天然偏大的低频绝对功率把 `delta` 视觉上放得过高。
+- `SLEEP RAW`
+  默认展示 **绝对带宽电压幅值 (μV)**，保留更接近原始慢波观察的口径。
+
 状态栏 `tvPsdStatus` 显示精简模式文案，例如：
 
 ```text
@@ -175,6 +186,8 @@ SLEEP RAW · STABILIZING
 - `GAIN`：影响频段数值显示缩放
 - `WINDOW`：影响 PSD 分析窗口长度
 - `Y zoom` 已从当前版本移除，频段图使用固定默认 Y 轴范围
+- `AWAKE FRONTAL` 下频段图 Y 轴固定为 `0~100%`
+- `SLEEP RAW` 下频段图 Y 轴仍使用绝对幅值上限
 
 ---
 
