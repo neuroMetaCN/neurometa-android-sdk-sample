@@ -22,6 +22,7 @@
 | PSD 参数调节 | ✅ | 当前仅保留 `Gain` 与 `Window` 两项控制 |
 | EDF 录制 | ✅ | 录制到 `Documents/edf/` |
 | 电池/佩戴状态显示 | ✅ | 实时显示设备电量与佩戴状态 |
+| 连接状态显示 | ✅ | 顶部 `CONNECTION` 卡片展示 SDK 连接状态 |
 
 ---
 
@@ -36,6 +37,7 @@ implementation(files("libs/neurometa-android-sdk-release.aar"))
 这意味着：
 - 如果只改 `neurometa-android-test` 代码，不需要重新打 SDK 包
 - 如果改了 `app/neurometa-android-sdk` 源码，必须重新生成并复制 AAR
+- 当前 `CONNECTION` 卡片读取已打包 AAR 暴露的 `DeviceManager` 连接状态与监听器，不新增 SDK API
 
 SDK 打包与复制命令：
 
@@ -96,6 +98,23 @@ cd app/neurometa-android-test
 - SmartEEG 广播名默认兼容 `SmartEEG-XXXX` 和 `EM09E-XXXXXX`
 - Demo 无需单独切换模式，SDK 会在连接阶段自动识别设备类型
 
+## SmartEEG Firmware OTA
+
+The test app validates OTA through the packaged `app/libs/neurometa-android-sdk-release.aar`.
+
+1. Build and copy the SDK AAR:
+   ```bash
+   cd ../neurometa-android-sdk
+   ./gradlew clean test copyAarToTest
+   ```
+2. Install the test app on an Android device.
+3. Connect a SmartEEG or EM09E device.
+4. Enter a local firmware path, for example `/sdcard/Download/firmware.bin`.
+5. Keep `Await device ACK` off for the default fast path, or enable it for diagnostics.
+6. Tap `START OTA` and watch state/progress/error logs.
+
+The SDK does not download firmware. The app must provide a local file path.
+
 ---
 
 ## 实时数据流
@@ -143,6 +162,16 @@ Device -> SDK DataCollector
 - `PSDAnalyzer.updateWearState(status.wear)`
 
 所以佩戴状态会直接影响 PSD 是否进入稳定输出。
+
+### 4. 连接状态显示
+
+主界面顶部 `CONNECTION` 卡片通过 SDK 现有连接状态源更新：
+
+- 初始化时读取 `sdk.getDeviceManager().getConnectionState()`
+- 运行时注册 `DeviceManager.ConnectionListener`
+- 展示 `DISCONNECTED / SCANNING / CONNECTING / CONNECTED / DISCONNECTING / RECONNECTING`
+
+该能力只消费现有 SDK 状态，不要求重新设计 SDK 对外 API。
 
 ---
 
@@ -218,7 +247,7 @@ app/neurometa-android-test/
 ### 文件职责
 
 - `app/src/main/java/com/neurometa/test/MainActivity.kt`
-  负责权限、SDK 初始化、设备扫描连接、监听器注册、UI 更新、EDF 录制
+  负责权限、SDK 初始化、设备扫描连接、连接状态卡片、监听器注册、UI 更新、EDF 录制
 - `app/src/main/java/com/neurometa/test/PsdUiState.kt`
   负责把 SDK 的 `PSDResult` 映射为 UI 所需的极简模型
 - `app/src/main/res/layout/activity_main.xml`

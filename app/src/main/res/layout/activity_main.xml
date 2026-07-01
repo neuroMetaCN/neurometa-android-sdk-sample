@@ -118,6 +118,34 @@
 
             </LinearLayout>
 
+            <!-- CONNECTION -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CONNECTION"
+                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary"
+                    android:letterSpacing="0.1" />
+
+                <TextView
+                    android:id="@+id/tvConnectionState"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="DISCONNECTED"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="8dp"
+                    android:maxLines="1" />
+
+            </LinearLayout>
+
 
 
         </LinearLayout>
@@ -603,6 +631,77 @@
                         android:progressBackgroundTint="@color/control_track" />
                 </LinearLayout>
 
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layoutOtaPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@color/surface_dark"
+            android:padding="16dp"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="FIRMWARE OTA"
+                android:textSize="12sp"
+                android:textColor="@color/section_label"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <EditText
+                android:id="@+id/etOtaFilePath"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="/sdcard/Download/firmware.bin"
+                android:singleLine="true"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary" />
+
+            <CheckBox
+                android:id="@+id/cbOtaAwaitAck"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Await device ACK"
+                android:textColor="@color/text_secondary" />
+
+            <TextView
+                android:id="@+id/tvOtaStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="OTA idle"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStartOta"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="START OTA"
+                    app:cornerRadius="4dp" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCancelOta"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:text="CANCEL"
+                    app:cornerRadius="4dp" />
             </LinearLayout>
         </LinearLayout>
 

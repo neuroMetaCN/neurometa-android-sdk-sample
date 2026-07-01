@@ -30,11 +30,13 @@ import com.neurometa.sdk.data.PSDAnalyzer
 import com.neurometa.sdk.data.PSDConfig
 import com.neurometa.sdk.device.DeviceManager
 import com.neurometa.sdk.edf.EdfRecorder
+import com.neurometa.sdk.model.ConnectionState
 import com.neurometa.sdk.model.Device
 import com.neurometa.sdk.model.DeviceStatus
 import com.neurometa.sdk.model.EEGDataPacket
 import com.neurometa.sdk.auth.License
 import com.neurometa.sdk.model.SDKError
+import com.neurometa.sdk.smarteeg.SmartEEGOtaStatus
 import com.neurometa.test.databinding.ActivityMainBinding
 import java.io.File
 import java.text.SimpleDateFormat
@@ -128,6 +130,39 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { log(message) }
             }
         }
+    private val otaListener = object : DeviceManager.SmartEEGOtaListener {
+        override fun onSmartEegOtaStatus(status: SmartEEGOtaStatus) {
+            runOnUiThread {
+                binding.tvOtaStatus.text = formatOtaStatus(status)
+                log("OTA ${status.state}: ${status.progress}% ${status.error ?: status.debugMessage.orEmpty()}")
+            }
+        }
+    }
+    private val connectionListener = object : DeviceManager.ConnectionListener {
+        override fun onConnected() {
+            runOnUiThread {
+                updateConnectionStateCard(ConnectionState.CONNECTED)
+            }
+        }
+
+        override fun onDisconnected() {
+            runOnUiThread {
+                updateConnectionStateCard(ConnectionState.DISCONNECTED)
+            }
+        }
+
+        override fun onStateChanged(state: ConnectionState) {
+            runOnUiThread {
+                updateConnectionStateCard(state)
+            }
+        }
+
+        override fun onError(error: SDKError) {
+            runOnUiThread {
+                updateConnectionStateCard(ConnectionState.DISCONNECTED)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,6 +193,14 @@ class MainActivity : AppCompatActivity() {
         binding.btnDisconnect.setOnClickListener { disconnect() }
         binding.btnClearLog.setOnClickListener { clearLog() }
         binding.btnRecordEdf.setOnClickListener { toggleRecording() }
+        binding.btnStartOta.setOnClickListener { startSmartEegOtaFromInput() }
+        binding.btnCancelOta.setOnClickListener {
+            val cancelled = sdk.getDeviceManager().cancelSmartEegOta()
+            log("OTA cancel requested: $cancelled")
+        }
+        sdk.getDeviceManager().addSmartEegOtaListener(otaListener)
+        sdk.getDeviceManager().addConnectionListener(connectionListener)
+        updateConnectionStateCard(sdk.getDeviceManager().getConnectionState())
         
         // 设置 FilteredEEGProcessor 回调，处理滤波后的数据并更新图表
         FilteredEEGProcessor.getInstance().setCallback { packet ->
@@ -671,6 +714,7 @@ class MainActivity : AppCompatActivity() {
 
         sdk.getDeviceManager().connect(
             deviceId = device.id,
+            deviceName = device.name,
             callback = object : DeviceManager.ConnectionCallback {
                 override fun onConnected() {
                     runOnUiThread {
@@ -722,6 +766,33 @@ class MainActivity : AppCompatActivity() {
         
         if (isRecording) {
             stopRecording()
+        }
+    }
+
+    private fun updateConnectionStateCard(state: ConnectionState) {
+        binding.tvConnectionState.text = formatConnectionState(state)
+        binding.tvConnectionState.setTextColor(connectionStateColor(state))
+    }
+
+    private fun formatConnectionState(state: ConnectionState): String {
+        return when (state) {
+            ConnectionState.DISCONNECTED -> "DISCONNECTED"
+            ConnectionState.SCANNING -> "SCANNING"
+            ConnectionState.CONNECTING -> "CONNECTING"
+            ConnectionState.CONNECTED -> "CONNECTED"
+            ConnectionState.DISCONNECTING -> "DISCONNECTING"
+            ConnectionState.RECONNECTING -> "RECONNECTING"
+        }
+    }
+
+    private fun connectionStateColor(state: ConnectionState): Int {
+        return when (state) {
+            ConnectionState.CONNECTED -> Color.parseColor("#00FF00")
+            ConnectionState.DISCONNECTED -> Color.parseColor("#9E9E9E")
+            ConnectionState.SCANNING,
+            ConnectionState.CONNECTING,
+            ConnectionState.DISCONNECTING,
+            ConnectionState.RECONNECTING -> Color.parseColor("#E53935")
         }
     }
 
@@ -874,6 +945,24 @@ class MainActivity : AppCompatActivity() {
         sdk.getEdfRecorder().stopRecording()
     }
 
+    private fun startSmartEegOtaFromInput() {
+        val path = binding.etOtaFilePath.text?.toString()?.trim().orEmpty()
+        if (path.isBlank()) {
+            log("Firmware path is required", isError = true)
+            return
+        }
+        val ok = sdk.getDeviceManager().startSmartEegOta(
+            filePath = path,
+            awaitAck = binding.cbOtaAwaitAck.isChecked
+        )
+        log("OTA start requested: $ok")
+    }
+
+    private fun formatOtaStatus(status: SmartEEGOtaStatus): String {
+        val base = "${status.state} ${status.progress}% (${status.sentChunks}/${status.totalChunks})"
+        return if (status.error.isNullOrBlank()) base else "$base ${status.error}"
+    }
+
     // ==================== 日志 ====================
 
     private fun clearLog() {
@@ -907,6 +996,8 @@ class MainActivity : AppCompatActivity() {
         timeHandler.removeCallbacks(timeUpdateRunnable)
         timeHandler.removeCallbacks(psdChartRenderRunnable)
         sdk.getDeviceManager().removeDataListener(rawBleDebugListener)
+        sdk.getDeviceManager().removeConnectionListener(connectionListener)
+        sdk.getDeviceManager().removeSmartEegOtaListener(otaListener)
         sdk.getDataCollector().removeUnfilteredDataListener(parsedEegDebugListener)
         psdAnalyzer.cleanup()
         if (isRecording) {
