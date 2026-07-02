@@ -1,6 +1,7 @@
 package com.neurometa.test
 
 import android.Manifest
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -14,6 +15,7 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.widget.SeekBar
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -39,6 +41,7 @@ import com.neurometa.sdk.model.SDKError
 import com.neurometa.sdk.smarteeg.SmartEEGOtaStatus
 import com.neurometa.test.databinding.ActivityMainBinding
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
@@ -47,6 +50,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_PERMISSIONS = 100
+        private const val MIN_OTA_BATTERY_LEVEL = 30
         private const val RAW_LOG_TAG = "NeuroMeta-TestRaw"
         private const val EEG_LOG_TAG = "NeuroMeta-TestEEG"
         private val REQUIRED_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -70,6 +74,15 @@ class MainActivity : AppCompatActivity() {
     private val sdk: NeuroMetaSDK by lazy { NeuroMetaSDK.getInstance() }
     private var connectedDevice: Device? = null
     private var isRecording = false
+    private var sdkListenersRegistered = false
+    private var latestBatteryLevel = -1
+    private var selectedFirmwareCachePath: String? = null
+    private val firmwarePicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                cacheSelectedFirmware(uri)
+            }
+        }
     
     // 图表数据 (5秒 @50Hz = 250 点)
     private val chartEntries = mutableListOf<Entry>()
@@ -193,14 +206,14 @@ class MainActivity : AppCompatActivity() {
         binding.btnDisconnect.setOnClickListener { disconnect() }
         binding.btnClearLog.setOnClickListener { clearLog() }
         binding.btnRecordEdf.setOnClickListener { toggleRecording() }
+        binding.btnSelectFirmwareFile.setOnClickListener { selectFirmwareFile() }
         binding.btnStartOta.setOnClickListener { startSmartEegOtaFromInput() }
         binding.btnCancelOta.setOnClickListener {
             val cancelled = sdk.getDeviceManager().cancelSmartEegOta()
             log("OTA cancel requested: $cancelled")
         }
-        sdk.getDeviceManager().addSmartEegOtaListener(otaListener)
-        sdk.getDeviceManager().addConnectionListener(connectionListener)
-        updateConnectionStateCard(sdk.getDeviceManager().getConnectionState())
+        binding.btnQueryFirmwareVersion.setOnClickListener { queryFirmwareVersion() }
+        updateConnectionStateCard(ConnectionState.DISCONNECTED)
         
         // 设置 FilteredEEGProcessor 回调，处理滤波后的数据并更新图表
         FilteredEEGProcessor.getInstance().setCallback { packet ->
@@ -221,6 +234,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateTime() {
         val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         binding.tvTime.text = time
+        updateFirmwareVersionDisplay()
     }
 
     private fun initChart() {
@@ -622,6 +636,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onSuccess() {
                     runOnUiThread {
                         log("SDK initialized successfully", isSuccess = true)
+                        registerSdkListeners()
                         setupDataListener()
                         setupPSDListener()
                     }
@@ -636,6 +651,14 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             log("Failed to load license: ${e.message}", isError = true)
         }
+    }
+
+    private fun registerSdkListeners() {
+        if (sdkListenersRegistered) return
+        sdk.getDeviceManager().addSmartEegOtaListener(otaListener)
+        sdk.getDeviceManager().addConnectionListener(connectionListener)
+        updateConnectionStateCard(sdk.getDeviceManager().getConnectionState())
+        sdkListenersRegistered = true
     }
 
     private fun setupDataListener() {
@@ -719,10 +742,12 @@ class MainActivity : AppCompatActivity() {
                 override fun onConnected() {
                     runOnUiThread {
                         log("Connected! Starting data stream", isSuccess = true)
-                        connectedDevice = device
+                        connectedDevice = sdk.getDeviceManager().getCurrentDevice() ?: device
+                        updateFirmwareVersionDisplay()
                         deviceAdapter.setConnectedDevice(device.id)
                         binding.btnScan.visibility = android.view.View.GONE
                         binding.btnDisconnect.visibility = android.view.View.VISIBLE
+                        scheduleFirmwareVersionQuery()
                     }
                 }
 
@@ -750,11 +775,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleDisconnect() {
         connectedDevice = null
+        latestBatteryLevel = -1
         deviceAdapter.setConnectedDevice(null)
         binding.btnScan.visibility = android.view.View.VISIBLE
         binding.btnDisconnect.visibility = android.view.View.GONE
         binding.tvBatteryLevel.text = "--"
         binding.tvWearStatus.text = "--"
+        binding.tvFirmwareVersion.text = "--"
+        binding.tvFirmwareVersion.setTextColor(Color.parseColor("#9E9E9E"))
         binding.tvSamplingRate.text = "-- Hz LIVE"
         binding.tvPsdStatus.text = "DISCONNECTED"
         binding.tvPsdStatus.setTextColor(Color.parseColor("#9E9E9E"))
@@ -811,6 +839,7 @@ class MainActivity : AppCompatActivity() {
 
         // 更新电池电量
         if (status.batteryLevel >= 0) {
+            latestBatteryLevel = status.batteryLevel
             binding.tvBatteryLevel.text = "${status.batteryLevel}%"
             val batteryColor = when {
                 status.batteryLevel > 50 -> Color.parseColor("#00FF00")
@@ -831,6 +860,38 @@ class MainActivity : AppCompatActivity() {
             binding.tvPsdStatus.setTextColor(Color.parseColor("#9E9E9E"))
             setPsdVisualState(PSDAnalyzer.SignalQuality.NOT_WORN, false)
         }
+    }
+
+    private fun scheduleFirmwareVersionQuery() {
+        timeHandler.postDelayed({ queryFirmwareVersion() }, 800)
+    }
+
+    private fun queryFirmwareVersion() {
+        if (!sdk.isInitialized()) {
+            log("SDK is not initialized", isError = true)
+            return
+        }
+        val requested = sdk.getDeviceManager().querySmartEegFirmwareVersion()
+        log("Firmware version query requested: $requested")
+        timeHandler.postDelayed({ updateFirmwareVersionDisplay() }, 500)
+        timeHandler.postDelayed({ updateFirmwareVersionDisplay() }, 1500)
+    }
+
+    private fun updateFirmwareVersionDisplay() {
+        if (!sdk.isInitialized()) {
+            binding.tvFirmwareVersion.text = "--"
+            binding.tvFirmwareVersion.setTextColor(Color.parseColor("#9E9E9E"))
+            return
+        }
+        val device = sdk.getDeviceManager().getCurrentDevice()
+        if (device != null) {
+            connectedDevice = device
+        }
+        val version = device?.firmwareVersion?.takeIf { it.isNotBlank() }
+        binding.tvFirmwareVersion.text = version ?: "--"
+        binding.tvFirmwareVersion.setTextColor(
+            if (version == null) Color.parseColor("#9E9E9E") else Color.parseColor("#00FF00")
+        )
     }
 
     // ==================== EEG 主图表 ====================
@@ -945,10 +1006,49 @@ class MainActivity : AppCompatActivity() {
         sdk.getEdfRecorder().stopRecording()
     }
 
+    private fun selectFirmwareFile() {
+        firmwarePicker.launch(arrayOf("application/octet-stream", "application/macbinary", "*/*"))
+    }
+
+    private fun cacheSelectedFirmware(uri: Uri) {
+        try {
+            val fileName = resolveFirmwareFileName(uri)
+            val outputDir = File(cacheDir, "firmware")
+            outputDir.mkdirs()
+            val outputFile = File(outputDir, fileName)
+            contentResolver.openInputStream(uri)?.use { input ->
+                outputFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            } ?: throw IOException("Unable to open selected file")
+            selectedFirmwareCachePath = outputFile.absolutePath
+            binding.etOtaFilePath.setText(outputFile.absolutePath)
+            log("Selected firmware: $fileName (${outputFile.length()} bytes)", isSuccess = true)
+        } catch (e: Exception) {
+            selectedFirmwareCachePath = null
+            log("Failed to cache firmware: ${e.message}", isError = true)
+        }
+    }
+
+    private fun resolveFirmwareFileName(uri: Uri): String {
+        val fallback = "firmware_${System.currentTimeMillis()}.bin"
+        val lastPath = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+        return lastPath ?: fallback
+    }
+
     private fun startSmartEegOtaFromInput() {
-        val path = binding.etOtaFilePath.text?.toString()?.trim().orEmpty()
+        val typedPath = binding.etOtaFilePath.text?.toString()?.trim().orEmpty()
+        val path = selectedFirmwareCachePath?.takeIf { typedPath == it } ?: typedPath
         if (path.isBlank()) {
             log("Firmware path is required", isError = true)
+            return
+        }
+        if (latestBatteryLevel < 0) {
+            log("Battery level unavailable; wait for battery data before OTA", isError = true)
+            return
+        }
+        if (latestBatteryLevel < MIN_OTA_BATTERY_LEVEL) {
+            log("Battery must be at least $MIN_OTA_BATTERY_LEVEL% for OTA; current=$latestBatteryLevel%", isError = true)
             return
         }
         val ok = sdk.getDeviceManager().startSmartEegOta(
@@ -995,14 +1095,18 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         timeHandler.removeCallbacks(timeUpdateRunnable)
         timeHandler.removeCallbacks(psdChartRenderRunnable)
-        sdk.getDeviceManager().removeDataListener(rawBleDebugListener)
-        sdk.getDeviceManager().removeConnectionListener(connectionListener)
-        sdk.getDeviceManager().removeSmartEegOtaListener(otaListener)
-        sdk.getDataCollector().removeUnfilteredDataListener(parsedEegDebugListener)
+        if (sdk.isInitialized()) {
+            sdk.getDeviceManager().removeDataListener(rawBleDebugListener)
+            sdk.getDeviceManager().removeConnectionListener(connectionListener)
+            sdk.getDeviceManager().removeSmartEegOtaListener(otaListener)
+            sdk.getDataCollector().removeUnfilteredDataListener(parsedEegDebugListener)
+        }
         psdAnalyzer.cleanup()
-        if (isRecording) {
+        if (sdk.isInitialized() && isRecording) {
             sdk.getEdfRecorder().stopRecording()
         }
-        sdk.getDeviceManager().disconnect()
+        if (sdk.isInitialized()) {
+            sdk.getDeviceManager().disconnect()
+        }
     }
 }
